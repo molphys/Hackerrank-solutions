@@ -1,0 +1,180 @@
+#!/usr/bin/python
+#https://www.geeksforgeeks.org/travelling-salesman-problem-implementation-using-backtracking/
+
+'''
+- save calculated path to the file. do not calculate next move till CLEAN
+- choose Z closest neighbourhs
+- sort them by (1) dx**2+dy**2 or by (2) abs(dx)+abs(dy)
+- calculate cost X levels in depth and Y closest nodes (Y<=X)
+- X=Y=9 - the maximum full solution, thus 81 edges
+- use defaultdic for cost matrix
+
+Target             16+39+64+117= 236??? : 56.4
+Greedy             16+41+75+126= 258 : 54.2
+Complete DFS 9x9   16+41+66+118= 241 : 55.9
+
+9 9  = 16+41+66+118
+
+
+'''
+#Travelling Salesman Problem implementation using recursive BackTracking / DFS
+from collections import defaultdict
+import sys
+
+def tsp_recursive(v,currPos,count,cost,p1=0,p3=0):
+    if p3: print('input=',count,':',cost,v)
+    # If last node is reached (count==n) and it has a link to the starting node (not None) i.e
+    # the source then keep the minimum value out of the total cost of
+    # traversal and "ans" Finally return to check for more possible values
+    if (count==num_depth+1):  #exclude COST[currPos][0], no need to check existence of the way back to start node
+        #cost=cost #exclude +COST[currPos][0], no need to include cost of the way back to start node
+        if p3: print(' count=',count,':',cost,v)
+        return [cost]+v
+
+    # BACKTRACKING STEP
+    # Loop to traverse the adjacency list
+    # of currPos node and increasing the count
+    # by 1 and cost by graph[currPos][i] value
+    ans=[float("inf")]+v
+    if count<=7:
+        b=-3
+    elif count<=9:
+        b=-1
+    else:
+        b=0
+    for i,next_cost in R[currPos]:
+        if (v[i]>n and b<num_breadth and next_cost):
+            b+=1
+            # Mark as visited
+            v[i]=count
+            res=tsp_recursive(v,i,count+1,cost+next_cost,p1,p3)
+            # Mark ith node as unvisited
+            v[i]=float("inf")
+            if res[0]<ans[0]:
+                ans=res
+            #break
+
+    if p1 and count==1: print('  exit=',count,':',ans)
+    return ans
+
+def next_move(posx,posy,dimx,dimy,board,p1=0,p3=0):
+    #read target from the file if it exists
+    try:
+        fptr=open('1.txt','r')
+        prev=fptr.readline()
+        fptr.close()
+        prev=tuple(map(int,prev.strip(')').strip('(').split(',')))
+        #prev=''
+    except:
+        prev=''
+    finally:
+        print('prev='+str(prev),file=sys.stderr)
+
+    #CLEAN if current position equals 'd' and clear the file
+    if board[posx][posy]=='d':
+        print('CLEAN')
+        fptr=open('1.txt','w')
+        fptr.write('')
+        fptr.close()
+        return
+
+    #global static data
+    global n,R,num_breadth,num_depth
+    #print board
+    if p1: print('\n'.join(map(lambda x:''.join(x),board)))
+
+    #collect nodes and sort them by distance from start
+    D=[(posx,posy,0)]
+    for i in range(dimx):
+        for j in range(dimy):
+            if board[i][j]=='d':
+                weight=(posx-i)**2+(posy-j)**2  #the best approach
+                #weight=abs(posx-i)+abs(posy-j)
+                D.append((i,j,weight))
+    D.sort(key=lambda x:x[2])
+
+    ###################################################################
+    #define limits for breadth and depth
+    num_depth=min(1000,len(D)-1)
+    if num_depth>8:
+        num_breadth=1
+    else:
+        num_breadth=num_depth
+
+    D=D[:num_depth+1]
+    if p1: print('|'.join(map(str,D)))
+
+    #build the neighbourhs matrix R with sorted by cost nodes
+    n=len(D)
+    R=defaultdict(tuple)
+    for i in range(n):
+        temp=[[j,float("inf")] for j in range(n)]
+        for j in range(n):
+            if i==j: continue
+            temp[j][1]=abs(D[i][0]-D[j][0])+abs(D[i][1]-D[j][1])
+        R[i]=tuple(sorted(temp,key=lambda y:y[1]))
+        #R[i]=tuple(temp)
+    if p1: [print(R[i]) for i in range(n)]
+
+
+    #find least route tsp(graph - adjacent matrix, v - visited nodes, currPos, n, count, cost):
+    num_depth=min(n,num_depth)
+    num_breadth=min(n,num_breadth)
+    if p1: print('min=',num_depth,num_breadth)
+    v=[float("inf") for i in range(n)]
+    v[0]=0
+    currPos=0
+    count=1
+    cost=0
+    if prev=='':
+        least_route=tsp_recursive(v,currPos,count,cost,p1,p3)
+        least_route_sorted=list(map(lambda y:y[0],sorted(enumerate(least_route[1:]),key=lambda y:y[1])))
+        if p1: print('least cost&route=',least_route[0],least_route_sorted)
+        if p1: [print(D[node]) for node in least_route_sorted]
+        #find target point
+        target=D[least_route_sorted[1]]
+        #save target to file
+        fptr=open('1.txt','w')
+        fptr.write(str(target))
+        fptr.close()
+    else:
+        #go to the saved in the file target
+        target=prev
+    if p1: print('target=',target)
+
+    #find next direction
+    least_cost=(target[0]-posx)**2+(target[1]-posy)**2
+    DIR='XXX'
+    #check down
+    if posx<dimx-1:
+        cost=(target[0]-posx-1)**2+(target[1]-posy)**2
+        if cost<least_cost:
+            least_cost=cost
+            DIR='DOWN'
+    #check up
+    if posx>0:
+        cost=(target[0]-posx+1)**2+(target[1]-posy)**2
+        if cost<least_cost:
+            least_cost=cost
+            DIR='UP'
+    #check right
+    if posy<dimy-1:
+        cost=(target[0]-posx)**2+(target[1]-posy-1)**2
+        if cost<least_cost:
+            least_cost=cost
+            DIR='RIGHT'
+    #check left
+    if posy>0:
+        cost=(target[0]-posx)**2+(target[1]-posy+1)**2
+        if cost<least_cost:
+            least_cost=cost
+            DIR='LEFT'
+
+    print(DIR)
+
+
+if __name__ == "__main__":
+    pos = [int(i) for i in input().strip().split()]
+    dim = [int(i) for i in input().strip().split()]
+    board = [[j for j in input().strip()] for i in range(dim[0])]
+    next_move(pos[0], pos[1], dim[0], dim[1], board)
